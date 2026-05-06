@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "name": "awesome-project",
+    "full_name": "testuser/awesome-project",
+    "description": "An awesome project",
+    "language": "Python",
+    "stargazers_count": 150,
+    "forks_count": 30,
+    "fork": false,
+    "updated_at": "2025-04-01T00:00:00Z",
+    "html_url": "https://github.com/testuser/awesome-project",
+    "owner": {"login": "testuser"}
+  },
+  {
+    "id": 2,
+    "name": "web-app",
+    "full_name": "testuser/web-app",
+    "description": "A web application",
+    "language": "TypeScript",
+    "stargazers_count": 80,
+    "forks_count": 15,
+    "fork": false,
+    "updated_at": "2025-03-15T00:00:00Z",
+    "html_url": "https://github.com/testuser/web-app",
+    "owner": {"login": "testuser"}
+  },
+  {
+    "id": 3,
+    "name": "forked-repo",
+    "full_name": "testuser/forked-repo",
+    "description": "A forked repository",
+    "language": "JavaScript",
+    "stargazers_count": 5,
+    "forks_count": 1,
+    "fork": true,
+    "updated_at": "2025-02-01T00:00:00Z",
+    "html_url": "https://github.com/testuser/forked-repo",
+    "owner": {"login": "testuser"}
+  }
+]

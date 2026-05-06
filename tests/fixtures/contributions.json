@@ -1,0 +1,27 @@
+{
+  "totalContributions": 1234,
+  "weeks": [
+    {
+      "contributionDays": [
+        {"contributionCount": 0, "date": "2025-01-06", "color": "#ebedf0", "weekday": 0},
+        {"contributionCount": 3, "date": "2025-01-07", "color": "#9be9a8", "weekday": 1},
+        {"contributionCount": 5, "date": "2025-01-08", "color": "#40c463", "weekday": 2},
+        {"contributionCount": 2, "date": "2025-01-09", "color": "#9be9a8", "weekday": 3},
+        {"contributionCount": 10, "date": "2025-01-10", "color": "#30a14e", "weekday": 4},
+        {"contributionCount": 0, "date": "2025-01-11", "color": "#ebedf0", "weekday": 5},
+        {"contributionCount": 1, "date": "2025-01-12", "color": "#9be9a8", "weekday": 6}
+      ]
+    },
+    {
+      "contributionDays": [
+        {"contributionCount": 4, "date": "2025-01-13", "color": "#9be9a8", "weekday": 0},
+        {"contributionCount": 20, "date": "2025-01-14", "color": "#216e39", "weekday": 1},
+        {"contributionCount": 0, "date": "2025-01-15", "color": "#ebedf0", "weekday": 2},
+        {"contributionCount": 7, "date": "2025-01-16", "color": "#40c463", "weekday": 3},
+        {"contributionCount": 3, "date": "2025-01-17", "color": "#9be9a8", "weekday": 4},
+        {"contributionCount": 0, "date": "2025-01-18", "color": "#ebedf0", "weekday": 5},
+        {"contributionCount": 0, "date": "2025-01-19", "color": "#ebedf0", "weekday": 6}
+      ]
+    }
+  ]
+}
