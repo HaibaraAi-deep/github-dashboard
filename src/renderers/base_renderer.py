@@ -1,11 +1,5 @@
-import io
 import logging
 from pathlib import Path
-
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
 
 from src.config import OUTPUT_DIR, THEMES, DEFAULT_THEME
 
@@ -36,19 +30,3 @@ class BaseRenderer:
 
     def _get_filepath(self, filename: str) -> Path:
         return self.output_dir / filename
-
-    def _render_matplotlib_to_string(self, fig) -> str:
-        try:
-            buf = io.BytesIO()
-            fig.savefig(buf, format="svg", bbox_inches="tight", transparent=True, dpi=150, pad_inches=0.1)
-            return buf.getvalue().decode("utf-8")
-        finally:
-            plt.close(fig)
-
-    def _save_matplotlib_to_file(self, fig, filename: str) -> str:
-        try:
-            filepath = self._get_filepath(filename)
-            fig.savefig(str(filepath), format="svg", bbox_inches="tight", transparent=True, dpi=150, pad_inches=0.1)
-            return str(filepath)
-        finally:
-            plt.close(fig)

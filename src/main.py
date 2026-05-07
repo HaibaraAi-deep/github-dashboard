@@ -17,7 +17,6 @@ from src.config import (
 from src.pipeline import collect_all, process_all, get_date_range
 from src.collectors.rest_collector import RESTCollector
 from src.collectors.graphql_collector import GraphQLCollector
-from src.processors.user_processor import UserProcessor
 from src.processors.repo_processor import RepoProcessor
 from src.processors.language_processor import LanguageProcessor
 from src.processors.contribution_processor import ContributionProcessor
@@ -236,27 +235,14 @@ def profile(ctx: click.Context) -> None:
         click.echo("Error: GitHub username is required.")
         sys.exit(1)
 
-    rest = RESTCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-    graphql = GraphQLCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-
-    user_data = rest.get_user(username)
-    repos_data = rest.get_repos(username, no_forks=obj["no_forks"])
-
-    from_date, to_date = get_date_range(obj["year"])
-    calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
-
-    user_proc = UserProcessor()
-    repo_proc = RepoProcessor()
-    contrib_proc = ContributionProcessor()
-
-    user_result = user_proc.process(user_data)
-    repo_result = repo_proc.process(repos_data, no_forks=obj["no_forks"])
-    contrib_result = contrib_proc.process(calendar_data)
-
-    user_result["total_stars"] = repo_result["total_stars"]
+    raw_data = collect_all(
+        username, obj["token"], obj["no_forks"],
+        year=obj["year"], cache_ttl=obj["cache_ttl"],
+    )
+    processed = process_all(raw_data, obj["no_forks"], obj["top_n"])
 
     renderer = ProfileCardRenderer(output_dir=obj["output"], theme=obj["theme"])
-    filepath = renderer.render(user_result, contribution_data=contrib_result)
+    filepath = renderer.render(processed["user"], contribution_data=processed["contributions"])
     if filepath:
         click.echo(f"Generated: {filepath}")
 

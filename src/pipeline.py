@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,11 +30,20 @@ def collect_all(username: str, token: str, no_forks: bool, year: int | None = No
     rest = RESTCollector(token=token, cache_ttl=cache_ttl)
     graphql = GraphQLCollector(token=token, cache_ttl=cache_ttl)
     logger.info(f"Fetching data for user: {username}")
+
     user_data = rest.get_user(username)
-    repos_data = rest.get_repos(username, no_forks=no_forks)
-    languages_data = rest.get_all_languages(username, no_forks=no_forks)
+
     from_date, to_date = get_date_range(year)
-    calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        repos_future = executor.submit(rest.get_repos, username, no_forks)
+        langs_future = executor.submit(rest.get_all_languages, username, no_forks)
+        calendar_future = executor.submit(graphql.get_contribution_calendar, username, from_date, to_date)
+
+        repos_data = repos_future.result()
+        languages_data = langs_future.result()
+        calendar_data = calendar_future.result()
+
     return {
         "user": user_data,
         "repos": repos_data,

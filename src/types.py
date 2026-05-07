@@ -70,10 +70,6 @@ class WeekdayStat(TypedDict):
     max: int
 
 
-class MonthlyStat(TypedDict):
-    pass
-
-
 class WeeklyTrendItem(TypedDict):
     date: str
     count: int
