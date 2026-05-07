@@ -1,5 +1,4 @@
 import logging
-import io
 
 import matplotlib
 matplotlib.use("Agg")
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class LanguageChartRenderer(BaseRenderer):
-    def _create_figure(self, language_data):
+    def _create_figure(self, language_data: dict):
         languages = language_data.get("languages", [])
         total_language_count = language_data.get("total_language_count", 0)
 
@@ -22,9 +21,8 @@ class LanguageChartRenderer(BaseRenderer):
 
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        names = [l["name"] for l in languages]
-        sizes = [l["percentage"] for l in languages]
-        colors = [l["color"] for l in languages]
+        sizes = [lang["percentage"] for lang in languages]
+        colors = [lang["color"] for lang in languages]
 
         wedges, texts, autotexts = ax.pie(
             sizes,
@@ -45,7 +43,7 @@ class LanguageChartRenderer(BaseRenderer):
         ax.text(0, 0, center_text, ha="center", va="center",
                 fontsize=14, fontweight="bold", color=self._get_color("text"))
 
-        legend_labels = [f"{l['name']} ({l['percentage']}%)" for l in languages]
+        legend_labels = [f"{lang['name']} ({lang['percentage']}%)" for lang in languages]
         ax.legend(
             wedges, legend_labels,
             title="Languages",
@@ -60,39 +58,18 @@ class LanguageChartRenderer(BaseRenderer):
 
         return fig
 
-    def render(self, language_data):
+    def render(self, language_data: dict) -> str | None:
         fig = self._create_figure(language_data)
         if not fig:
             return None
 
-        filepath = self._get_filepath("languages.svg")
-        fig.savefig(
-            str(filepath),
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
+        filepath = self._save_matplotlib_to_file(fig, "languages.svg")
         logger.info(f"Language chart saved to {filepath}")
-        return str(filepath)
+        return filepath
 
-    def _render_to_string(self, language_data):
+    def _render_to_string(self, language_data: dict) -> str:
         fig = self._create_figure(language_data)
         if not fig:
             return ""
 
-        svg_buffer = io.BytesIO()
-        fig.savefig(
-            svg_buffer,
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
-        return svg_buffer.getvalue().decode("utf-8")
+        return self._render_matplotlib_to_string(fig)

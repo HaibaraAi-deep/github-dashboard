@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class RepoProcessor:
-    def process(self, repos_data, no_forks=False, top_n=DEFAULT_TOP_N):
+    def process(self, repos_data: list | None, no_forks: bool = False, top_n: int = DEFAULT_TOP_N) -> dict:
         if not repos_data:
             return {
                 "total_repos": 0,
@@ -33,7 +33,7 @@ class RepoProcessor:
         sorted_by_stars = sorted(repos, key=lambda r: r.get("stargazers_count", 0), reverse=True)
         sorted_by_forks = sorted(repos, key=lambda r: r.get("forks_count", 0), reverse=True)
 
-        def _format_repo(repo):
+        def _format_repo(repo: dict) -> dict:
             return {
                 "name": repo.get("name", ""),
                 "full_name": repo.get("full_name", ""),

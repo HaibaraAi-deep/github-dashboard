@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 import svgwrite
 
@@ -9,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class HeatmapRenderer(BaseRenderer):
-    def _create_drawing(self, contribution_data, year=None):
+    def _create_drawing(self, contribution_data: dict, year: int | None = None):
         weeks = contribution_data.get("weeks", [])
         total = contribution_data.get("totalContributions", 0)
 
@@ -127,7 +126,7 @@ class HeatmapRenderer(BaseRenderer):
 
         return dwg
 
-    def render(self, contribution_data, year=None):
+    def render(self, contribution_data: dict, year: int | None = None) -> str | None:
         dwg = self._create_drawing(contribution_data, year)
         if not dwg:
             return None
@@ -138,7 +137,7 @@ class HeatmapRenderer(BaseRenderer):
         logger.info(f"Heatmap saved to {filepath}")
         return str(filepath)
 
-    def _render_to_string(self, contribution_data, year=None):
+    def _render_to_string(self, contribution_data: dict, year: int | None = None) -> str:
         dwg = self._create_drawing(contribution_data, year)
         if not dwg:
             return ""

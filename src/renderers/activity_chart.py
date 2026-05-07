@@ -1,5 +1,4 @@
 import logging
-import io
 from datetime import datetime
 
 import matplotlib
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ActivityChartRenderer(BaseRenderer):
-    def _create_figure(self, contribution_data):
+    def _create_figure(self, contribution_data: dict):
         weekly_trend = contribution_data.get("weekly_trend", [])
 
         if not weekly_trend:
@@ -77,39 +76,18 @@ class ActivityChartRenderer(BaseRenderer):
 
         return fig
 
-    def render(self, contribution_data):
+    def render(self, contribution_data: dict) -> str | None:
         fig = self._create_figure(contribution_data)
         if not fig:
             return None
 
-        filepath = self._get_filepath("activity.svg")
-        fig.savefig(
-            str(filepath),
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
+        filepath = self._save_matplotlib_to_file(fig, "activity.svg")
         logger.info(f"Activity chart saved to {filepath}")
-        return str(filepath)
+        return filepath
 
-    def _render_to_string(self, contribution_data):
+    def _render_to_string(self, contribution_data: dict) -> str:
         fig = self._create_figure(contribution_data)
         if not fig:
             return ""
 
-        svg_buffer = io.BytesIO()
-        fig.savefig(
-            svg_buffer,
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
-        return svg_buffer.getvalue().decode("utf-8")
+        return self._render_matplotlib_to_string(fig)

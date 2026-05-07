@@ -2,23 +2,24 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import Any, Optional
 
-from src.config import CACHE_DIR, CACHE_TTL
+from src.config import CACHE_DIR, CACHE_TTL, MAX_CACHE_ENTRIES
 
 logger = logging.getLogger(__name__)
 
 
 class Cache:
-    def __init__(self, cache_dir=None, ttl=None):
-        self.cache_dir = Path(cache_dir) if cache_dir else CACHE_DIR
-        self.ttl = ttl if ttl is not None else CACHE_TTL
+    def __init__(self, cache_dir: Optional[str] = None, ttl: Optional[int] = None) -> None:
+        self.cache_dir: Path = Path(cache_dir) if cache_dir else CACHE_DIR
+        self.ttl: int = ttl if ttl is not None else CACHE_TTL
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_filepath(self, key):
+    def _get_filepath(self, key: str) -> Path:
         safe_key = key.replace("/", "_").replace("?", "_").replace("&", "_")
         return self.cache_dir / f"{safe_key}.json"
 
-    def get(self, key):
+    def get(self, key: str) -> Optional[Any]:
         filepath = self._get_filepath(key)
         if not filepath.exists():
             return None
@@ -34,7 +35,19 @@ class Cache:
             logger.warning(f"Cache read error for key {key}: {e}")
             return None
 
-    def set(self, key, content):
+    def set(self, key: str, content: Any) -> None:
+        cache_files = sorted(
+            self.cache_dir.glob("*.json"),
+            key=lambda f: f.stat().st_mtime,
+        )
+        while len(cache_files) >= MAX_CACHE_ENTRIES:
+            oldest = cache_files.pop(0)
+            try:
+                oldest.unlink()
+                logger.debug(f"Evicted oldest cache file: {oldest}")
+            except OSError:
+                break
+
         filepath = self._get_filepath(key)
         try:
             with open(filepath, "w", encoding="utf-8") as f:
@@ -43,7 +56,7 @@ class Cache:
         except (OSError, TypeError) as e:
             logger.warning(f"Cache write error for key {key}: {e}")
 
-    def clear(self):
+    def clear(self) -> None:
         for filepath in self.cache_dir.glob("*.json"):
             try:
                 filepath.unlink()
@@ -51,7 +64,10 @@ class Cache:
                 pass
         logger.info("Cache cleared")
 
-    def remove(self, key):
+    def remove(self, key: str) -> None:
         filepath = self._get_filepath(key)
         if filepath.exists():
             filepath.unlink()
+
+    def __len__(self) -> int:
+        return sum(1 for _ in self.cache_dir.glob("*.json"))

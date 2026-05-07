@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 class UserProcessor:
-    def process(self, user_data):
+    def process(self, user_data: dict | None) -> dict:
         if user_data is None:
             return {}
 

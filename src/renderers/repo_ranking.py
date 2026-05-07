@@ -1,5 +1,4 @@
 import logging
-import io
 
 import matplotlib
 matplotlib.use("Agg")
@@ -13,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RepoRankingRenderer(BaseRenderer):
-    def _create_figure(self, repo_data, top_n=5):
+    def _create_figure(self, repo_data: dict, top_n: int = 5):
         top_repos = repo_data.get("top_by_stars", [])[:top_n]
 
         if not top_repos:
@@ -69,39 +68,18 @@ class RepoRankingRenderer(BaseRenderer):
 
         return fig
 
-    def render(self, repo_data, top_n=5):
+    def render(self, repo_data: dict, top_n: int = 5) -> str | None:
         fig = self._create_figure(repo_data, top_n)
         if not fig:
             return None
 
-        filepath = self._get_filepath("repo-ranking.svg")
-        fig.savefig(
-            str(filepath),
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
+        filepath = self._save_matplotlib_to_file(fig, "repo-ranking.svg")
         logger.info(f"Repo ranking chart saved to {filepath}")
-        return str(filepath)
+        return filepath
 
-    def _render_to_string(self, repo_data, top_n=5):
+    def _render_to_string(self, repo_data: dict, top_n: int = 5) -> str:
         fig = self._create_figure(repo_data, top_n)
         if not fig:
             return ""
 
-        svg_buffer = io.BytesIO()
-        fig.savefig(
-            svg_buffer,
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
-        return svg_buffer.getvalue().decode("utf-8")
+        return self._render_matplotlib_to_string(fig)

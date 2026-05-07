@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>GitHub Personal Dashboard</title>
     <style>
         * {
@@ -17,6 +18,33 @@
             color: #c9d1d9;
             min-height: 100vh;
             padding: 20px;
+        }
+
+        body[data-theme="light"] {
+            background: linear-gradient(135deg, #ffffff 0%, #f6f8fa 100%);
+            color: #24292f;
+        }
+        body[data-theme="light"] .config-card,
+        body[data-theme="light"] .card {
+            background: #f6f8fa;
+            border-color: #d0d7de;
+        }
+        body[data-theme="light"] .header h1 {
+            background: linear-gradient(90deg, #0969da 0%, #1a7f37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        body[data-theme="light"] .form-group input,
+        body[data-theme="light"] .form-group select {
+            background: #ffffff;
+            border-color: #d0d7de;
+            color: #24292f;
+        }
+        body[data-theme="light"] .error-message {
+            background: rgba(248, 81, 73, 0.1);
+            color: #cf222e;
+            border-color: #cf222e;
         }
 
         .container {
@@ -70,6 +98,7 @@
         }
 
         .form-group input[type="text"],
+        .form-group input[type="password"],
         .form-group input[type="number"],
         .form-group select {
             width: 100%;
@@ -127,6 +156,24 @@
         .btn-generate:disabled {
             background: #30363d;
             cursor: not-allowed;
+        }
+
+        .btn-cancel {
+            background: linear-gradient(135deg, #da3633 0%, #f85149 100%);
+            border: none;
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-cancel:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(248, 81, 73, 0.4);
         }
 
         .loading {
@@ -212,7 +259,7 @@
                     </div>
                     <div class="form-group">
                         <label for="token">Personal Access Token (可选)</label>
-                        <input type="text" id="token" placeholder="ghp_xxx">
+                        <input type="password" id="token" placeholder="ghp_xxx" autocomplete="off">
                     </div>
                     <div class="form-group">
                         <label for="theme">主题</label>
@@ -233,6 +280,7 @@
                 <button type="submit" class="btn-generate" style="margin-top: 20px;">
                     生成 Dashboard
                 </button>
+                <button type="button" id="cancel-btn" class="btn-cancel" style="display:none;">取消</button>
             </form>
         </div>
 
@@ -241,29 +289,30 @@
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
             <p>正在获取数据并生成可视化...</p>
+            <p>已等待 <span id="elapsed">0</span> 秒</p>
             <p style="font-size: 0.85rem; color: #6e7681;">这可能需要几秒钟时间</p>
         </div>
 
         <div id="dashboard" class="dashboard" style="display: none;">
             <div class="card" style="grid-column: 1 / -1;">
                 <h3>👤 个人信息</h3>
-                <div class="svg-container" id="profile-svg"></div>
+                <div class="svg-container" id="profile-svg" role="img" aria-label="个人信息卡片"></div>
             </div>
             <div class="card" style="grid-column: 1 / -1;">
                 <h3>🔥 贡献热力图</h3>
-                <div class="svg-container" id="heatmap-svg"></div>
+                <div class="svg-container" id="heatmap-svg" role="img" aria-label="贡献热力图"></div>
             </div>
             <div class="card">
                 <h3>🛠️ 语言统计</h3>
-                <div class="svg-container" id="languages-svg"></div>
+                <div class="svg-container" id="languages-svg" role="img" aria-label="语言统计图表"></div>
             </div>
             <div class="card">
                 <h3>📈 活跃度趋势</h3>
-                <div class="svg-container" id="activity-svg"></div>
+                <div class="svg-container" id="activity-svg" role="img" aria-label="活跃度趋势图表"></div>
             </div>
             <div class="card" style="grid-column: 1 / -1;">
                 <h3>⭐ 热门仓库</h3>
-                <div class="svg-container" id="repo-svg"></div>
+                <div class="svg-container" id="repo-svg" role="img" aria-label="热门仓库排名"></div>
             </div>
         </div>
     </div>
@@ -274,6 +323,7 @@
         const errorDiv = document.getElementById("error");
         const dashboardDiv = document.getElementById("dashboard");
         const generateBtn = document.querySelector(".btn-generate");
+        const cancelBtn = document.getElementById("cancel-btn");
 
         const svgContainers = {
             profile: document.getElementById("profile-svg"),
@@ -283,8 +333,51 @@
             repo: document.getElementById("repo-svg")
         };
 
+        let startTime;
+        let progressTimer;
+        let currentController = null;
+
+        function safeInsertSVG(container, svgString) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgString, 'image/svg+xml');
+            const svgEl = doc.querySelector('svg');
+            if (svgEl) {
+                container.innerHTML = '';
+                container.appendChild(document.adoptNode(svgEl));
+            } else {
+                container.innerHTML = '<p style="color: #8b949e;">暂无数据</p>';
+            }
+        }
+
+        function startProgress() {
+            startTime = Date.now();
+            const elapsedEl = document.getElementById("elapsed");
+            progressTimer = setInterval(() => {
+                const seconds = Math.floor((Date.now() - startTime) / 1000);
+                elapsedEl.textContent = seconds;
+            }, 1000);
+        }
+
+        function stopProgress() {
+            if (progressTimer) clearInterval(progressTimer);
+        }
+
+        document.getElementById("theme").addEventListener("change", function() {
+            document.body.setAttribute("data-theme", this.value);
+        });
+
+        cancelBtn.addEventListener("click", () => {
+            if (currentController) {
+                currentController.abort();
+                currentController = null;
+            }
+        });
+
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
+
+            if (currentController) currentController.abort();
+            currentController = new AbortController();
 
             const formData = new FormData();
             formData.append("username", document.getElementById("username").value.trim());
@@ -297,11 +390,17 @@
             loadingDiv.style.display = "block";
             dashboardDiv.style.display = "none";
             generateBtn.disabled = true;
+            cancelBtn.style.display = "block";
+            startProgress();
 
             try {
                 const response = await fetch("/generate", {
                     method: "POST",
-                    body: formData
+                    body: formData,
+                    signal: currentController.signal,
+                    headers: {
+                        "X-CSRFToken": document.querySelector('meta[name="csrf-token"]')?.content || ""
+                    }
                 });
 
                 const result = await response.json();
@@ -312,20 +411,29 @@
 
                 for (const [key, value] of Object.entries(result)) {
                     if (value) {
-                        svgContainers[key].innerHTML = value;
+                        safeInsertSVG(svgContainers[key], value);
                     } else {
-                        svgContainers[key].innerHTML = `<p style="color: #8b949e;">暂无数据</p>`;
+                        svgContainers[key].innerHTML = '<p style="color: #8b949e;">暂无数据</p>';
                     }
                 }
 
                 loadingDiv.style.display = "none";
                 dashboardDiv.style.display = "grid";
+                dashboardDiv.setAttribute("tabindex", "-1");
+                dashboardDiv.focus();
             } catch (err) {
-                errorDiv.textContent = "错误: " + err.message;
+                if (err.name === "AbortError") {
+                    errorDiv.textContent = "请求已取消";
+                } else {
+                    errorDiv.textContent = "错误: " + err.message;
+                }
                 errorDiv.style.display = "block";
                 loadingDiv.style.display = "none";
             } finally {
                 generateBtn.disabled = false;
+                cancelBtn.style.display = "none";
+                stopProgress();
+                currentController = null;
             }
         });
     </script>

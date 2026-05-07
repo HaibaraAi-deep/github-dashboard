@@ -1,7 +1,7 @@
 import json
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.collectors.base import BaseCollector
 from src.collectors.rest_collector import RESTCollector

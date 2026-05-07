@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Optional
 
 import requests
 
@@ -9,17 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    def __init__(self, token=None, threshold=100):
-        self.token = token
-        self.threshold = threshold
-        self.session = requests.Session()
+    def __init__(self, token: Optional[str] = None, threshold: int = 100) -> None:
+        self.token: Optional[str] = token
+        self.threshold: int = threshold
+        self.session: requests.Session = requests.Session()
         if token:
             self.session.headers.update({
                 "Authorization": f"token {token}",
                 "Accept": "application/vnd.github.v3+json",
             })
 
-    def check_and_wait(self):
+    def check_and_wait(self) -> int:
         try:
             response = self.session.get(f"{GITHUB_API_BASE}/rate_limit")
             response.raise_for_status()
@@ -45,7 +46,7 @@ class RateLimiter:
             logger.warning(f"Rate limit check failed: {e}")
             return -1
 
-    def get_remaining(self):
+    def get_remaining(self) -> int:
         try:
             response = self.session.get(f"{GITHUB_API_BASE}/rate_limit")
             response.raise_for_status()

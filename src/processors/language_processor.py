@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class LanguageProcessor:
-    def process(self, languages_data, top_n=DEFAULT_TOP_N):
+    def process(self, languages_data: dict | None, top_n: int = DEFAULT_TOP_N) -> dict:
         if not languages_data:
             return {
                 "languages": [],
