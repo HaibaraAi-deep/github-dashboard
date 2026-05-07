@@ -33,6 +33,16 @@ class TestHeatmapRenderer(unittest.TestCase):
         filepath = self.renderer.render({})
         self.assertIsNone(filepath)
 
+    def test_render_svg_content(self):
+        data = load_fixture("contributions.json")
+        filepath = self.renderer.render(data, year=2025)
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("<svg", content)
+            self.assertIn("</svg>", content)
+            self.assertNotIn("<script", content)
+
 
 class TestLanguageChartRenderer(unittest.TestCase):
     def setUp(self):
@@ -58,6 +68,23 @@ class TestLanguageChartRenderer(unittest.TestCase):
         filepath = self.renderer.render({"languages": []})
         self.assertIsNone(filepath)
 
+    def test_render_svg_content(self):
+        data = {
+            "languages": [
+                {"name": "Python", "bytes": 50000, "percentage": 50.0, "color": "#3572A5"},
+                {"name": "JavaScript", "bytes": 30000, "percentage": 30.0, "color": "#f1e05a"},
+            ],
+            "total_bytes": 80000,
+        }
+        filepath = self.renderer.render(data)
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("<svg", content)
+            self.assertIn("</svg>", content)
+            self.assertIn("Python", content)
+            self.assertNotIn("<script", content)
+
 
 class TestActivityChartRenderer(unittest.TestCase):
     def setUp(self):
@@ -81,6 +108,21 @@ class TestActivityChartRenderer(unittest.TestCase):
         filepath = self.renderer.render({"weekly_trend": []})
         self.assertIsNone(filepath)
 
+    def test_render_svg_content(self):
+        data = {
+            "weekly_trend": [
+                {"date": "2025-01-06", "count": 10},
+                {"date": "2025-01-13", "count": 25},
+            ]
+        }
+        filepath = self.renderer.render(data)
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("<svg", content)
+            self.assertIn("</svg>", content)
+            self.assertNotIn("<script", content)
+
 
 class TestRepoRankingRenderer(unittest.TestCase):
     def setUp(self):
@@ -102,6 +144,21 @@ class TestRepoRankingRenderer(unittest.TestCase):
     def test_render_empty(self):
         filepath = self.renderer.render({"top_by_stars": []})
         self.assertIsNone(filepath)
+
+    def test_render_svg_content(self):
+        data = {
+            "top_by_stars": [
+                {"name": "awesome-project", "stars": 150, "language": "Python", "forks": 30, "description": "A project", "full_name": "user/awesome-project", "updated_at": "2025-01-01", "html_url": "https://github.com/user/awesome-project"},
+            ]
+        }
+        filepath = self.renderer.render(data, top_n=5)
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("<svg", content)
+            self.assertIn("</svg>", content)
+            self.assertIn("awesome-project", content)
+            self.assertNotIn("<script", content)
 
 
 class TestProfileCardRenderer(unittest.TestCase):
@@ -129,6 +186,27 @@ class TestProfileCardRenderer(unittest.TestCase):
     def test_render_empty(self):
         filepath = self.renderer.render(None)
         self.assertIsNone(filepath)
+
+    def test_render_svg_content(self):
+        user_data = {
+            "login": "testuser",
+            "name": "Test User",
+            "bio": "A test user",
+            "avatar_url": "https://avatars.githubusercontent.com/u/12345?v=4",
+            "public_repos": 25,
+            "followers": 100,
+            "following": 50,
+            "total_stars": 235,
+            "account_age_years": 7.0,
+        }
+        filepath = self.renderer.render(user_data)
+        if filepath:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("<svg", content)
+            self.assertIn("</svg>", content)
+            self.assertIn("testuser", content)
+            self.assertNotIn("<script", content)
 
 
 if __name__ == "__main__":

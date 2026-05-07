@@ -1,9 +1,10 @@
 import logging
 import os
 import re
+import secrets
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -14,10 +15,13 @@ from src.renderers.language_chart import LanguageChartRenderer
 from src.renderers.activity_chart import ActivityChartRenderer
 from src.renderers.repo_ranking import RepoRankingRenderer
 from src.renderers.profile_card import ProfileCardRenderer
-from src.exceptions import DashboardError, ValidationError
+from src.exceptions import DashboardError, ValidationError, RateLimitError
+from src.utils.rate_limiter import RateLimiter
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY or os.urandom(24)
+
+app.config["RATELIMIT_STORAGE_URI"] = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -25,6 +29,7 @@ limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
 )
 
 SVG_SCRIPT_PATTERN = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
@@ -46,6 +51,36 @@ def _validate_username(username: str) -> str:
     return username
 
 
+def _generate_csrf_token() -> str:
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return session["csrf_token"]
+
+
+app.jinja_env.globals["csrf_token"] = _generate_csrf_token
+
+
+@app.before_request
+def _check_csrf() -> tuple | None:
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        token = request.headers.get("X-CSRFToken", "")
+        session_token = session.get("csrf_token", "")
+        if not token or not session_token or not secrets.compare_digest(token, session_token):
+            return jsonify({"error": "CSRF token 验证失败"}), 403
+    return None
+
+
+def _check_rate_limit(token: str) -> None:
+    if not token:
+        return
+    limiter = RateLimiter(token=token)
+    remaining = limiter.get_remaining()
+    if remaining == 0:
+        raise RateLimitError("GitHub API 配额已用尽，请稍后重试")
+    if remaining < 10:
+        logging.warning(f"GitHub API quota low: {remaining} remaining")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -57,6 +92,7 @@ def generate():
     try:
         username = _validate_username(request.form.get("username", ""))
         token = request.form.get("token", "")
+        _check_rate_limit(token)
         no_forks = request.form.get("no_forks", False)
         theme = request.form.get("theme", "dark")
         year = request.form.get("year", None)

@@ -11,31 +11,48 @@ class TestApp(unittest.TestCase):
         app.config["TESTING"] = True
         self.ctx = app.app_context()
         self.ctx.push()
-        app.jinja_env.globals["csrf_token"] = lambda: "test-csrf"
+        with self.client.session_transaction() as sess:
+            sess["csrf_token"] = "test-csrf-token"
 
     def tearDown(self):
         self.ctx.pop()
+
+    def _post(self, url, data=None):
+        return self.client.post(
+            url,
+            data=data or {},
+            headers={"X-CSRFToken": "test-csrf-token"},
+        )
 
     def test_index(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
 
     def test_generate_no_username(self):
-        response = self.client.post("/generate", data={})
+        response = self._post("/generate", data={})
         self.assertEqual(response.status_code, 400)
 
     def test_generate_invalid_username(self):
-        response = self.client.post("/generate", data={"username": "-invalid"})
+        response = self._post("/generate", data={"username": "-invalid"})
         self.assertEqual(response.status_code, 400)
+
+    def test_generate_csrf_failure(self):
+        response = self.client.post(
+            "/generate",
+            data={"username": "octocat"},
+            headers={"X-CSRFToken": "wrong-token"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_generate_missing_csrf(self):
+        response = self.client.post("/generate", data={"username": "octocat"})
+        self.assertEqual(response.status_code, 403)
 
     @patch("app.process_all")
     @patch("app.collect_all")
     def test_generate_server_error(self, mock_collect, mock_process):
         mock_collect.side_effect = DashboardError("API failure")
-        response = self.client.post(
-            "/generate",
-            data={"username": "octocat", "token": "fake"},
-        )
+        response = self._post("/generate", data={"username": "octocat", "token": "fake"})
         self.assertEqual(response.status_code, 500)
         data = response.get_json()
         self.assertIn("error", data)

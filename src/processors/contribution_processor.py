@@ -2,11 +2,13 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
+from src.types import ContributionResult
+
 logger = logging.getLogger(__name__)
 
 
 class ContributionProcessor:
-    def process(self, calendar_data: dict | None) -> dict:
+    def process(self, calendar_data: dict | None) -> ContributionResult:
         if not calendar_data:
             return {
                 "total_contributions": 0,

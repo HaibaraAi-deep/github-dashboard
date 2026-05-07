@@ -1,11 +1,13 @@
 import logging
 from datetime import datetime, timezone
 
+from src.types import UserInfo
+
 logger = logging.getLogger(__name__)
 
 
 class UserProcessor:
-    def process(self, user_data: dict | None) -> dict:
+    def process(self, user_data: dict | None) -> UserInfo:
         if user_data is None:
             return {}
 

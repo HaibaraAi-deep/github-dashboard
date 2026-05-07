@@ -1,12 +1,13 @@
 import logging
 
 from src.config import DEFAULT_TOP_N
+from src.types import RepoResult
 
 logger = logging.getLogger(__name__)
 
 
 class RepoProcessor:
-    def process(self, repos_data: list | None, no_forks: bool = False, top_n: int = DEFAULT_TOP_N) -> dict:
+    def process(self, repos_data: list | None, no_forks: bool = False, top_n: int = DEFAULT_TOP_N) -> RepoResult:
         if not repos_data:
             return {
                 "total_repos": 0,

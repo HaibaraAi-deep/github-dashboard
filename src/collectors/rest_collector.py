@@ -85,22 +85,36 @@ class RESTCollector(BaseCollector):
 
         return all_languages
 
+    def _fetch_repo_activity(self, repo: dict, no_forks: bool) -> dict[str, Any] | None:
+        if repo.get("fork") and no_forks:
+            return None
+        owner = repo["owner"]["login"]
+        name = repo["name"]
+        try:
+            activity = self.get_commit_activity(owner, name)
+            if activity and isinstance(activity, list):
+                return {"repo": name, "activity": activity}
+        except Exception as e:
+            logger.warning(f"Failed to get commit activity for {name}: {e}")
+        return None
+
     def get_all_commit_activity(self, username: str, no_forks: bool = False) -> List[Dict[str, Any]]:
         self._validate_username(username)
         repos = self.get_repos(username, no_forks=no_forks)
         all_activity: List[Dict[str, Any]] = []
-        for repo in repos:
-            if repo.get("fork") and no_forks:
-                continue
-            owner = repo["owner"]["login"]
-            name = repo["name"]
-            try:
-                activity = self.get_commit_activity(owner, name)
-                if activity and isinstance(activity, list):
-                    all_activity.append({
-                        "repo": name,
-                        "activity": activity,
-                    })
-            except Exception as e:
-                logger.warning(f"Failed to get commit activity for {name}: {e}")
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(self._fetch_repo_activity, repo, no_forks): repo
+                for repo in repos
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result:
+                        all_activity.append(result)
+                except Exception as e:
+                    repo = futures[future]
+                    logger.warning(f"Failed to fetch activity for {repo.get('name', 'unknown')}: {e}")
+
         return all_activity

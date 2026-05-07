@@ -255,7 +255,7 @@
                 <div class="config-row">
                     <div class="form-group">
                         <label for="username">GitHub 用户名 *</label>
-                        <input type="text" id="username" placeholder="octocat" required>
+                        <input type="text" id="username" placeholder="octocat" required pattern="[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}" title="GitHub 用户名只能包含字母、数字和连字符，且不能以连字符开头">
                     </div>
                     <div class="form-group">
                         <label for="token">Personal Access Token (可选)</label>
@@ -340,6 +340,11 @@
         function safeInsertSVG(container, svgString) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgString, 'image/svg+xml');
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                container.innerHTML = '<p style="color: #f85149;">SVG 内容安全校验未通过</p>';
+                return;
+            }
             const svgEl = doc.querySelector('svg');
             if (svgEl) {
                 container.innerHTML = '';

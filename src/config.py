@@ -19,8 +19,7 @@ OUTPUT_DIR: Path = Path(os.getenv("OUTPUT_DIR", str(BASE_DIR / "output")))
 CACHE_DIR: Path = Path(os.getenv("CACHE_DIR", str(BASE_DIR / ".cache")))
 CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))
 MAX_CACHE_ENTRIES: int = int(os.getenv("MAX_CACHE_ENTRIES", "1000"))
-
-GITHUB_USERNAME_PATTERN: re.Pattern = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$")
+GITHUB_USERNAME_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$")
 
 DEFAULT_TOP_N: int = 10
 DEFAULT_THEME: str = "dark"
@@ -28,10 +27,7 @@ DEFAULT_NO_FORKS: bool = False
 
 FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "")
 FLASK_DEBUG: bool = os.getenv("FLASK_DEBUG", "false").lower() in ("true", "1", "yes")
-
-GITHUB_USERNAME_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$")
-
-MAX_CACHE_ENTRIES: int = int(os.getenv("MAX_CACHE_ENTRIES", "1000"))
+RATELIMIT_STORAGE_URI: str = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
 _COLORS_PATH = Path(__file__).resolve().parent / "data" / "github_colors.json"
 with open(_COLORS_PATH, "r", encoding="utf-8") as _f:

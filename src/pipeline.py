@@ -9,6 +9,7 @@ from src.processors.repo_processor import RepoProcessor
 from src.processors.language_processor import LanguageProcessor
 from src.processors.contribution_processor import ContributionProcessor
 from src.config import DEFAULT_TOP_N
+from src.types import UserInfo, RepoResult, LanguageResult, ContributionResult
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def collect_all(username: str, token: str, no_forks: bool, year: int | None = No
     }
 
 
-def process_all(raw_data: dict[str, Any], no_forks: bool = False, top_n: int = DEFAULT_TOP_N) -> dict[str, Any]:
+def process_all(raw_data: dict[str, Any], no_forks: bool = False, top_n: int = DEFAULT_TOP_N) -> dict[str, UserInfo | RepoResult | LanguageResult | ContributionResult]:
     user_proc = UserProcessor()
     repo_proc = RepoProcessor()
     lang_proc = LanguageProcessor()
