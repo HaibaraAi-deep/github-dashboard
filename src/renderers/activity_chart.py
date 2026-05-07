@@ -1,12 +1,6 @@
 import logging
-import io
-from datetime import datetime
 
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+import svgwrite
 
 from src.renderers.base_renderer import BaseRenderer
 
@@ -14,102 +8,157 @@ logger = logging.getLogger(__name__)
 
 
 class ActivityChartRenderer(BaseRenderer):
-    def _create_figure(self, contribution_data):
+    def _create_drawing(self, contribution_data: dict):
         weekly_trend = contribution_data.get("weekly_trend", [])
 
         if not weekly_trend:
             logger.warning("No activity data for chart")
             return None
 
-        dates = []
-        counts = []
+        valid_items = []
         for item in weekly_trend:
             date_str = item.get("date", "")
+            count = item.get("count", 0)
             if date_str:
-                try:
-                    dates.append(datetime.strptime(date_str, "%Y-%m-%d"))
-                    counts.append(item.get("count", 0))
-                except ValueError:
-                    continue
+                valid_items.append((date_str, count))
 
-        if not dates:
+        if not valid_items:
             logger.warning("No valid dates in activity data")
             return None
 
-        fig, ax = plt.subplots(figsize=(8, 4))
+        card_width = 800
+        chart_left = 50
+        chart_right = card_width - 30
+        chart_top = 30
+        chart_bottom = 220
+        card_height = 260
 
-        accent = self._get_color("accent")
+        dwg = svgwrite.Drawing(
+            size=(f"{card_width}px", f"{card_height}px"),
+        )
+
+        bg_color = self._get_color("card_bg")
         text_color = self._get_color("text")
         text_secondary = self._get_color("text_secondary")
+        accent = self._get_color("accent")
+        border_color = self._get_color("border")
 
-        ax.fill_between(dates, counts, alpha=0.3, color=accent)
-        ax.plot(dates, counts, color=accent, linewidth=1.5)
+        dwg.add(dwg.rect(
+            insert=(0, 0),
+            size=(card_width, card_height),
+            rx=self.card_radius,
+            fill=bg_color,
+            stroke=border_color,
+            stroke_width=1,
+        ))
 
-        if counts:
-            max_count = max(counts)
-            max_idx = counts.index(max_count)
-            ax.annotate(
-                f"{max_count}",
-                xy=(dates[max_idx], max_count),
-                xytext=(0, 10),
-                textcoords="offset points",
-                ha="center",
-                fontsize=9,
-                fontweight="bold",
-                color=text_color,
-                arrowprops=dict(arrowstyle="->", color=text_secondary, lw=0.8),
-            )
+        max_count = max(c for _, c in valid_items) if valid_items else 1
+        if max_count == 0:
+            max_count = 1
 
-        ax.set_xlabel("Date", fontsize=10, color=text_secondary)
-        ax.set_ylabel("Contributions", fontsize=10, color=text_secondary)
-        ax.tick_params(colors=text_secondary, labelsize=8)
+        chart_width = chart_right - chart_left
+        chart_height_px = chart_bottom - chart_top
 
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
-        fig.autofmt_xdate(rotation=45, ha="right")
+        for i in range(5):
+            y = chart_bottom - (i / 4) * chart_height_px
+            val = int((i / 4) * max_count)
+            dwg.add(dwg.line(
+                start=(chart_left, y),
+                end=(chart_right, y),
+                stroke=text_secondary,
+                stroke_opacity=0.15,
+                stroke_width=1,
+            ))
+            dwg.add(dwg.text(
+                str(val),
+                insert=(chart_left - 8, y + 4),
+                fill=text_secondary,
+                font_size="9px",
+                font_family=self.font_family,
+                text_anchor="end",
+            ))
 
-        for spine in ax.spines.values():
-            spine.set_visible(False)
+        n = len(valid_items)
+        points = []
+        for idx, (date_str, count) in enumerate(valid_items):
+            x = chart_left + (idx / max(n - 1, 1)) * chart_width
+            y = chart_bottom - (count / max_count) * chart_height_px
+            points.append((x, y))
 
-        ax.set_facecolor("none")
-        fig.patch.set_alpha(0)
-        ax.grid(axis="y", alpha=0.2, color=text_secondary)
+        if len(points) >= 2:
+            area_path = f"M {points[0][0]},{chart_bottom} "
+            for px, py in points:
+                area_path += f"L {px},{py} "
+            area_path += f"L {points[-1][0]},{chart_bottom} Z"
 
-        return fig
+            dwg.add(dwg.path(
+                d=area_path,
+                fill=accent,
+                fill_opacity=0.2,
+            ))
 
-    def render(self, contribution_data):
-        fig = self._create_figure(contribution_data)
-        if not fig:
+            line_path = f"M {points[0][0]},{points[0][1]} "
+            for px, py in points[1:]:
+                line_path += f"L {px},{py} "
+
+            dwg.add(dwg.path(
+                d=line_path,
+                fill="none",
+                stroke=accent,
+                stroke_width=2,
+            ))
+
+        if points:
+            max_idx = max(range(len(valid_items)), key=lambda i: valid_items[i][1])
+            mx, my = points[max_idx]
+
+            dwg.add(dwg.circle(
+                center=(mx, my),
+                r=4,
+                fill=accent,
+            ))
+
+            dwg.add(dwg.text(
+                str(valid_items[max_idx][1]),
+                insert=(mx, my - 12),
+                fill=text_color,
+                font_size="10px",
+                font_family=self.font_family,
+                font_weight="bold",
+                text_anchor="middle",
+            ))
+
+        label_count = min(n, 8)
+        step = max(n // label_count, 1)
+        for idx in range(0, n, step):
+            x = chart_left + (idx / max(n - 1, 1)) * chart_width
+            date_str = valid_items[idx][0]
+            label = date_str[5:]
+            dwg.add(dwg.text(
+                label,
+                insert=(x, chart_bottom + 16),
+                fill=text_secondary,
+                font_size="9px",
+                font_family=self.font_family,
+                text_anchor="middle",
+                transform=f"rotate(-30, {x}, {chart_bottom + 16})",
+            ))
+
+        return dwg
+
+    def render(self, contribution_data: dict) -> str | None:
+        dwg = self._create_drawing(contribution_data)
+        if not dwg:
             return None
 
         filepath = self._get_filepath("activity.svg")
-        fig.savefig(
-            str(filepath),
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
+        dwg.filename = str(filepath)
+        dwg.save()
         logger.info(f"Activity chart saved to {filepath}")
         return str(filepath)
 
-    def _render_to_string(self, contribution_data):
-        fig = self._create_figure(contribution_data)
-        if not fig:
+    def _render_to_string(self, contribution_data: dict) -> str:
+        dwg = self._create_drawing(contribution_data)
+        if not dwg:
             return ""
-
-        svg_buffer = io.BytesIO()
-        fig.savefig(
-            svg_buffer,
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
-        return svg_buffer.getvalue().decode("utf-8")
+        return dwg.tostring()

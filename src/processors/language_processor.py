@@ -1,12 +1,13 @@
 import logging
 
 from src.config import DEFAULT_TOP_N, GITHUB_COLORS
+from src.types import LanguageResult
 
 logger = logging.getLogger(__name__)
 
 
 class LanguageProcessor:
-    def process(self, languages_data, top_n=DEFAULT_TOP_N):
+    def process(self, languages_data: dict | None, top_n: int = DEFAULT_TOP_N) -> LanguageResult:
         if not languages_data:
             return {
                 "languages": [],

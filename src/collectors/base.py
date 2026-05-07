@@ -1,9 +1,11 @@
 import logging
 import time
+from typing import Any, Dict, Optional
 
 import requests
 
-from src.config import GITHUB_API_BASE, GITHUB_TOKEN
+from src.config import GITHUB_TOKEN, GITHUB_USERNAME_PATTERN
+from src.exceptions import APIError, ValidationError
 from src.utils.cache import Cache
 from src.utils.rate_limiter import RateLimiter
 
@@ -11,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class BaseCollector:
-    def __init__(self, token=None, cache_ttl=None):
-        self.token = token or GITHUB_TOKEN
-        self.session = requests.Session()
+    def __init__(self, token: Optional[str] = None, cache_ttl: Optional[int] = None) -> None:
+        self.token: str = token or GITHUB_TOKEN
+        self.session: requests.Session = requests.Session()
         self.session.headers.update({
             "User-Agent": "GitHub-Personal-Dashboard/1.0",
             "Accept": "application/vnd.github.v3+json",
@@ -23,13 +25,18 @@ class BaseCollector:
                 "Authorization": f"token {self.token}",
             })
 
-        self.cache = Cache(ttl=cache_ttl)
-        self.rate_limiter = RateLimiter(token=self.token)
-        self.max_retries = 3
-        self.retry_delay = 1
+        self.cache: Cache = Cache(ttl=cache_ttl)
+        self.rate_limiter: RateLimiter = RateLimiter(token=self.token)
+        self.max_retries: int = 3
+        self.retry_delay: int = 1
 
-    def _request_with_retry(self, url, params=None, method="GET"):
-        delay = self.retry_delay
+    def _validate_username(self, username: str) -> str:
+        if not GITHUB_USERNAME_PATTERN.match(username):
+            raise ValidationError(f"Invalid GitHub username: {username}")
+        return username
+
+    def _request_with_retry(self, url: str, params: Optional[Dict[str, Any]] = None, method: str = "GET") -> Dict[str, Any]:
+        delay: int = self.retry_delay
         for attempt in range(self.max_retries):
             try:
                 if method == "GET":
@@ -76,9 +83,12 @@ class BaseCollector:
                 time.sleep(delay)
                 delay *= 2
 
-        raise Exception(f"Request failed after {self.max_retries} retries: {url}")
+        raise APIError(
+            f"Request failed after {self.max_retries} retries",
+            url=url,
+        )
 
-    def _fetch_with_cache(self, cache_key, url, params=None):
+    def _fetch_with_cache(self, cache_key: str, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         cached = self.cache.get(cache_key)
         if cached is not None:
             return cached

@@ -1,7 +1,7 @@
 import logging
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -14,9 +14,9 @@ from src.config import (
     DEFAULT_NO_FORKS,
     CACHE_TTL,
 )
+from src.pipeline import collect_all, process_all, get_date_range
 from src.collectors.rest_collector import RESTCollector
 from src.collectors.graphql_collector import GraphQLCollector
-from src.processors.user_processor import UserProcessor
 from src.processors.repo_processor import RepoProcessor
 from src.processors.language_processor import LanguageProcessor
 from src.processors.contribution_processor import ContributionProcessor
@@ -34,61 +34,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _get_date_range(year=None):
-    if year:
-        from_date = f"{year}-01-01T00:00:00Z"
-        to_date = f"{year}-12-31T23:59:59Z"
-    else:
-        now = datetime.now(timezone.utc)
-        from_date = f"{now.year}-01-01T00:00:00Z"
-        to_date = now.strftime("%Y-%m-%dT23:59:59Z")
-    return from_date, to_date
-
-
-def _collect_all(username, token, no_forks, top_n, year, cache_ttl):
-    rest = RESTCollector(token=token, cache_ttl=cache_ttl)
-    graphql = GraphQLCollector(token=token, cache_ttl=cache_ttl)
-
-    logger.info(f"Fetching data for user: {username}")
-
-    user_data = rest.get_user(username)
-    repos_data = rest.get_repos(username, no_forks=no_forks)
-    languages_data = rest.get_all_languages(username, no_forks=no_forks)
-
-    from_date, to_date = _get_date_range(year)
-    calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
-
-    return {
-        "user": user_data,
-        "repos": repos_data,
-        "languages": languages_data,
-        "calendar": calendar_data,
-    }
-
-
-def _process_all(raw_data, no_forks, top_n):
-    user_proc = UserProcessor()
-    repo_proc = RepoProcessor()
-    lang_proc = LanguageProcessor()
-    contrib_proc = ContributionProcessor()
-
-    user_result = user_proc.process(raw_data["user"])
-    repo_result = repo_proc.process(raw_data["repos"], no_forks=no_forks, top_n=top_n)
-    lang_result = lang_proc.process(raw_data["languages"], top_n=top_n)
-    contrib_result = contrib_proc.process(raw_data["calendar"])
-
-    user_result["total_stars"] = repo_result["total_stars"]
-
-    return {
-        "user": user_result,
-        "repos": repo_result,
-        "languages": lang_result,
-        "contributions": contrib_result,
-    }
-
-
-def _render_all(processed_data, output_dir, theme, top_n):
-    results = {}
+def _render_all(processed_data: dict[str, Any], output_dir: str, theme: str, top_n: int) -> dict[str, str | None]:
+    results: dict[str, str | None] = {}
 
     heatmap = HeatmapRenderer(output_dir=output_dir, theme=theme)
     results["heatmap"] = heatmap.render(
@@ -127,8 +74,7 @@ def _render_all(processed_data, output_dir, theme, top_n):
 @click.option("--push", is_flag=True, default=False, help="Auto commit and push generated files")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Enable verbose logging")
 @click.pass_context
-def cli(ctx, username, token, output, year, top_n, no_forks, theme, cache_ttl, dry_run, push, verbose):
-    """GitHub Personal Dashboard - Generate SVG charts for your GitHub profile."""
+def cli(ctx: click.Context, username: str, token: str, output: str, year: int | None, top_n: int, no_forks: bool, theme: str, cache_ttl: int, dry_run: bool, push: bool, verbose: bool) -> None:
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
@@ -149,8 +95,7 @@ def cli(ctx, username, token, output, year, top_n, no_forks, theme, cache_ttl, d
 
 @cli.command()
 @click.pass_context
-def all(ctx):
-    """Generate all charts."""
+def all(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -158,12 +103,12 @@ def all(ctx):
         click.echo("Error: GitHub username is required. Use --username or set GITHUB_USERNAME in .env")
         sys.exit(1)
 
-    raw_data = _collect_all(
+    raw_data = collect_all(
         username, obj["token"], obj["no_forks"],
-        obj["top_n"], obj["year"], obj["cache_ttl"],
+        year=obj["year"], cache_ttl=obj["cache_ttl"],
     )
 
-    processed = _process_all(raw_data, obj["no_forks"], obj["top_n"])
+    processed = process_all(raw_data, obj["no_forks"], obj["top_n"])
 
     if obj["dry_run"]:
         click.echo("Dry run mode - data fetched successfully, skipping chart generation")
@@ -192,8 +137,7 @@ def all(ctx):
 
 @cli.command()
 @click.pass_context
-def heatmap(ctx):
-    """Generate contribution heatmap only."""
+def heatmap(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -202,7 +146,7 @@ def heatmap(ctx):
         sys.exit(1)
 
     graphql = GraphQLCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-    from_date, to_date = _get_date_range(obj["year"])
+    from_date, to_date = get_date_range(obj["year"])
     calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
 
     contrib_proc = ContributionProcessor()
@@ -216,8 +160,7 @@ def heatmap(ctx):
 
 @cli.command()
 @click.pass_context
-def languages(ctx):
-    """Generate language distribution chart only."""
+def languages(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -239,8 +182,7 @@ def languages(ctx):
 
 @cli.command()
 @click.pass_context
-def activity(ctx):
-    """Generate activity trend chart only."""
+def activity(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -249,7 +191,7 @@ def activity(ctx):
         sys.exit(1)
 
     graphql = GraphQLCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-    from_date, to_date = _get_date_range(obj["year"])
+    from_date, to_date = get_date_range(obj["year"])
     calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
 
     contrib_proc = ContributionProcessor()
@@ -263,8 +205,7 @@ def activity(ctx):
 
 @cli.command(name="repos")
 @click.pass_context
-def repos(ctx):
-    """Generate repository ranking chart only."""
+def repos(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -286,8 +227,7 @@ def repos(ctx):
 
 @cli.command()
 @click.pass_context
-def profile(ctx):
-    """Generate profile card only."""
+def profile(ctx: click.Context) -> None:
     obj = ctx.obj
     username = obj["username"]
 
@@ -295,27 +235,14 @@ def profile(ctx):
         click.echo("Error: GitHub username is required.")
         sys.exit(1)
 
-    rest = RESTCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-    graphql = GraphQLCollector(token=obj["token"], cache_ttl=obj["cache_ttl"])
-
-    user_data = rest.get_user(username)
-    repos_data = rest.get_repos(username, no_forks=obj["no_forks"])
-
-    from_date, to_date = _get_date_range(obj["year"])
-    calendar_data = graphql.get_contribution_calendar(username, from_date, to_date)
-
-    user_proc = UserProcessor()
-    repo_proc = RepoProcessor()
-    contrib_proc = ContributionProcessor()
-
-    user_result = user_proc.process(user_data)
-    repo_result = repo_proc.process(repos_data, no_forks=obj["no_forks"])
-    contrib_result = contrib_proc.process(calendar_data)
-
-    user_result["total_stars"] = repo_result["total_stars"]
+    raw_data = collect_all(
+        username, obj["token"], obj["no_forks"],
+        year=obj["year"], cache_ttl=obj["cache_ttl"],
+    )
+    processed = process_all(raw_data, obj["no_forks"], obj["top_n"])
 
     renderer = ProfileCardRenderer(output_dir=obj["output"], theme=obj["theme"])
-    filepath = renderer.render(user_result, contribution_data=contrib_result)
+    filepath = renderer.render(processed["user"], contribution_data=processed["contributions"])
     if filepath:
         click.echo(f"Generated: {filepath}")
 

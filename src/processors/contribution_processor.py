@@ -2,11 +2,13 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
+from src.types import ContributionResult
+
 logger = logging.getLogger(__name__)
 
 
 class ContributionProcessor:
-    def process(self, calendar_data):
+    def process(self, calendar_data: dict | None) -> ContributionResult:
         if not calendar_data:
             return {
                 "total_contributions": 0,
@@ -43,7 +45,7 @@ class ContributionProcessor:
             "weekly_trend": weekly_stats,
         }
 
-    def _calculate_streak(self, all_days):
+    def _calculate_streak(self, all_days: list) -> dict:
         if not all_days:
             return {"current": 0, "longest": 0}
 
@@ -75,7 +77,7 @@ class ContributionProcessor:
             "longest": longest_streak,
         }
 
-    def _calculate_averages(self, all_days, total_contributions):
+    def _calculate_averages(self, all_days: list, total_contributions: int) -> dict:
         if not all_days:
             return {"daily": 0, "weekly": 0, "monthly": 0}
 
@@ -93,7 +95,7 @@ class ContributionProcessor:
             "monthly": monthly,
         }
 
-    def _calculate_weekday_stats(self, all_days):
+    def _calculate_weekday_stats(self, all_days: list) -> dict:
         weekday_counts = defaultdict(list)
         for day in all_days:
             weekday = day.get("weekday", 0)
@@ -112,7 +114,7 @@ class ContributionProcessor:
 
         return stats
 
-    def _calculate_monthly_stats(self, all_days):
+    def _calculate_monthly_stats(self, all_days: list) -> dict:
         monthly = defaultdict(int)
         for day in all_days:
             date_str = day.get("date", "")
@@ -122,7 +124,7 @@ class ContributionProcessor:
 
         return dict(sorted(monthly.items()))
 
-    def _calculate_weekly_trend(self, weeks):
+    def _calculate_weekly_trend(self, weeks: list) -> list:
         trend = []
         for week in weeks:
             total = sum(

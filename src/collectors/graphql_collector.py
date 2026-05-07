@@ -1,10 +1,12 @@
 import logging
 import time
+from typing import Any, Dict, List, Optional
 
 import requests
 
 from src.collectors.base import BaseCollector
 from src.config import GITHUB_GRAPHQL_URL
+from src.exceptions import APIError
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +51,8 @@ query {
 
 
 class GraphQLCollector(BaseCollector):
-    def _graphql_request(self, query, variables=None):
-        payload = {"query": query}
+    def _graphql_request(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"query": query}
         if variables:
             payload["variables"] = variables
 
@@ -59,7 +61,7 @@ class GraphQLCollector(BaseCollector):
         if cached is not None:
             return cached
 
-        delay = self.retry_delay
+        delay: int = self.retry_delay
         for attempt in range(self.max_retries):
             try:
                 response = self.session.post(
@@ -73,7 +75,7 @@ class GraphQLCollector(BaseCollector):
                     if "errors" in data:
                         error_msgs = [e.get("message", "Unknown error") for e in data["errors"]]
                         logger.error(f"GraphQL errors: {error_msgs}")
-                        raise Exception(f"GraphQL query failed: {error_msgs}")
+                        raise APIError(f"GraphQL query failed: {error_msgs}")
                     self.cache.set(cache_key, data["data"])
                     return data["data"]
 
@@ -98,13 +100,14 @@ class GraphQLCollector(BaseCollector):
                 time.sleep(delay)
                 delay *= 2
             except requests.exceptions.ConnectionError:
-                logger.warning(f"GraphQL connection error, retrying...")
+                logger.warning("GraphQL connection error, retrying...")
                 time.sleep(delay)
                 delay *= 2
 
-        raise Exception(f"GraphQL request failed after {self.max_retries} retries")
+        raise APIError(f"GraphQL request failed after {self.max_retries} retries")
 
-    def get_contribution_calendar(self, username, from_date, to_date):
+    def get_contribution_calendar(self, username: str, from_date: str, to_date: str) -> Dict[str, Any]:
+        self._validate_username(username)
         variables = {
             "username": username,
             "from": from_date,
@@ -113,12 +116,12 @@ class GraphQLCollector(BaseCollector):
         data = self._graphql_request(QUERY_CONTRIBUTION_CALENDAR, variables)
         return data.get("user", {}).get("contributionsCollection", {}).get("contributionCalendar", {})
 
-    def get_contribution_years(self, username):
+    def get_contribution_years(self, username: str) -> List[int]:
+        self._validate_username(username)
         variables = {"username": username}
         data = self._graphql_request(QUERY_CONTRIBUTION_YEARS, variables)
         return data.get("user", {}).get("contributionsCollection", {}).get("contributionYears", [])
 
-    def get_rate_limit(self):
+    def get_rate_limit(self) -> Dict[str, Any]:
         data = self._graphql_request(QUERY_RATE_LIMIT)
         return data.get("rateLimit", {})
-

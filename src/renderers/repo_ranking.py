@@ -1,10 +1,6 @@
 import logging
-import io
 
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
+import svgwrite
 
 from src.config import GITHUB_COLORS
 from src.renderers.base_renderer import BaseRenderer
@@ -13,95 +9,106 @@ logger = logging.getLogger(__name__)
 
 
 class RepoRankingRenderer(BaseRenderer):
-    def _create_figure(self, repo_data, top_n=5):
+    def _create_drawing(self, repo_data: dict, top_n: int = 5):
         top_repos = repo_data.get("top_by_stars", [])[:top_n]
 
         if not top_repos:
             logger.warning("No repo data for ranking chart")
             return None
 
-        fig, ax = plt.subplots(figsize=(8, len(top_repos) * 0.8 + 1))
+        card_width = 800
+        bar_height = 36
+        bar_gap = 8
+        padding = 24
+        chart_left = 140
+        chart_right = card_width - 80
+        card_height = padding * 2 + len(top_repos) * (bar_height + bar_gap)
 
+        dwg = svgwrite.Drawing(
+            size=(f"{card_width}px", f"{card_height}px"),
+        )
+
+        bg_color = self._get_color("card_bg")
         text_color = self._get_color("text")
         text_secondary = self._get_color("text_secondary")
         accent = self._get_color("accent")
+        border_color = self._get_color("border")
 
-        names = [r["name"] for r in reversed(top_repos)]
-        stars = [r["stars"] for r in reversed(top_repos)]
-        languages = [r.get("language", "") for r in reversed(top_repos)]
+        dwg.add(dwg.rect(
+            insert=(0, 0),
+            size=(card_width, card_height),
+            rx=self.card_radius,
+            fill=bg_color,
+            stroke=border_color,
+            stroke_width=1,
+        ))
 
-        bar_colors = [GITHUB_COLORS.get(lang, accent) for lang in languages]
+        max_stars = max(r["stars"] for r in top_repos) if top_repos else 1
+        if max_stars == 0:
+            max_stars = 1
 
-        bars = ax.barh(names, stars, color=bar_colors, height=0.6, edgecolor="none")
+        bar_width = chart_right - chart_left
 
-        for bar, star_count in zip(bars, stars):
-            width = bar.get_width()
-            ax.text(
-                width + max(stars) * 0.02,
-                bar.get_y() + bar.get_height() / 2,
-                f"★ {star_count}",
-                va="center",
-                fontsize=9,
-                color=text_color,
-            )
+        for i, repo in enumerate(reversed(top_repos)):
+            y = padding + i * (bar_height + bar_gap)
+            name = repo.get("name", "")
+            stars = repo.get("stars", 0)
+            lang = repo.get("language", "")
 
-        for i, lang in enumerate(languages):
-            if lang:
-                ax.text(
-                    max(stars) * 0.02,
-                    i,
+            dwg.add(dwg.text(
+                name[:20],
+                insert=(padding, y + bar_height / 2 + 4),
+                fill=text_color,
+                font_size="12px",
+                font_family=self.font_family,
+                font_weight="600",
+                text_anchor="start",
+            ))
+
+            bar_fill_width = (stars / max_stars) * bar_width
+            bar_color = GITHUB_COLORS.get(lang, accent)
+
+            dwg.add(dwg.rect(
+                insert=(chart_left, y + 4),
+                size=(bar_fill_width, bar_height - 8),
+                rx=4,
+                fill=bar_color,
+                fill_opacity=0.85,
+            ))
+
+            if lang and bar_fill_width > 40:
+                dwg.add(dwg.text(
                     lang,
-                    va="center",
-                    fontsize=8,
-                    color="white",
-                    fontweight="bold",
-                )
+                    insert=(chart_left + 10, y + bar_height / 2 + 3),
+                    fill="white",
+                    font_size="10px",
+                    font_family=self.font_family,
+                    font_weight="bold",
+                ))
 
-        ax.set_xlabel("Stars", fontsize=10, color=text_secondary)
-        ax.tick_params(colors=text_secondary, labelsize=9)
+            dwg.add(dwg.text(
+                f"★ {stars}",
+                insert=(chart_right + 8, y + bar_height / 2 + 4),
+                fill=text_secondary,
+                font_size="11px",
+                font_family=self.font_family,
+            ))
 
-        for spine in ax.spines.values():
-            spine.set_visible(False)
+        return dwg
 
-        ax.set_facecolor("none")
-        fig.patch.set_alpha(0)
-        ax.grid(axis="x", alpha=0.2, color=text_secondary)
-
-        return fig
-
-    def render(self, repo_data, top_n=5):
-        fig = self._create_figure(repo_data, top_n)
-        if not fig:
+    def render(self, repo_data: dict, top_n: int = 5) -> str | None:
+        dwg = self._create_drawing(repo_data, top_n)
+        if not dwg:
             return None
 
         filepath = self._get_filepath("repo-ranking.svg")
-        fig.savefig(
-            str(filepath),
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
+        dwg.filename = str(filepath)
+        dwg.save()
         logger.info(f"Repo ranking chart saved to {filepath}")
         return str(filepath)
 
-    def _render_to_string(self, repo_data, top_n=5):
-        fig = self._create_figure(repo_data, top_n)
-        if not fig:
+    def _render_to_string(self, repo_data: dict, top_n: int = 5) -> str:
+        dwg = self._create_drawing(repo_data, top_n)
+        if not dwg:
             return ""
-
-        svg_buffer = io.BytesIO()
-        fig.savefig(
-            svg_buffer,
-            format="svg",
-            bbox_inches="tight",
-            transparent=True,
-            dpi=150,
-            pad_inches=0.1,
-        )
-        plt.close(fig)
-
-        return svg_buffer.getvalue().decode("utf-8")
+        return dwg.tostring()

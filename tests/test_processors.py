@@ -93,7 +93,7 @@ class TestLanguageProcessor(unittest.TestCase):
         self.assertEqual(len(result["languages"]), 3)
         self.assertEqual(result["languages"][0]["name"], "Python")
         self.assertAlmostEqual(result["languages"][0]["percentage"], 50.0)
-        self.assertIn("Other", [l["name"] for l in result["languages"]])
+        self.assertIn("Other", [lang["name"] for lang in result["languages"]])
 
     def test_process_single_language(self):
         data = {"Python": 10000}

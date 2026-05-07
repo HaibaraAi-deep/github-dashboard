@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProfileCardRenderer(BaseRenderer):
-    def _create_drawing(self, user_data, contribution_data=None):
+    def _create_drawing(self, user_data: dict, contribution_data: dict | None = None):
         if not user_data:
             logger.warning("No user data for profile card")
             return None
@@ -136,7 +136,7 @@ class ProfileCardRenderer(BaseRenderer):
 
         return dwg
 
-    def render(self, user_data, contribution_data=None):
+    def render(self, user_data: dict, contribution_data: dict | None = None) -> str | None:
         dwg = self._create_drawing(user_data, contribution_data)
         if not dwg:
             return None
@@ -147,7 +147,7 @@ class ProfileCardRenderer(BaseRenderer):
         logger.info(f"Profile card saved to {filepath}")
         return str(filepath)
 
-    def _render_to_string(self, user_data, contribution_data=None):
+    def _render_to_string(self, user_data: dict, contribution_data: dict | None = None) -> str:
         dwg = self._create_drawing(user_data, contribution_data)
         if not dwg:
             return ""
